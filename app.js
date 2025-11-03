@@ -6,6 +6,7 @@ let dataArray;
 let bufferLength;
 let isAudioActive = false;
 let animationId;
+let debugLog = [];
 
 // Текущие настройки
 let currentSettings = {
@@ -26,7 +27,21 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeSliders();
     setupAudioButton();
     registerServiceWorker();
+    addDebugLog('Приложение загружено');
 });
+
+// Функция отладочного лога
+function addDebugLog(message) {
+    const timestamp = new Date().toLocaleTimeString();
+    debugLog.push(`[${timestamp}] ${message}`);
+    if (debugLog.length > 10) debugLog.shift();
+    
+    const debugOutput = document.getElementById('debug-output');
+    if (debugOutput) {
+        debugOutput.innerHTML = debugLog.map(log => `<div>${log}</div>`).join('');
+    }
+    console.log(message);
+}
 
 // Инициализация выбора пресетов
 function initializePresetSelector() {
@@ -44,18 +59,18 @@ function initializePresetSelector() {
             loadPreset(e.target.value);
         }
     });
+    
+    addDebugLog('Пресеты загружены: ' + Object.keys(PRESETS).length);
 }
 
 // Загрузка пресета
 function loadPreset(presetName) {
     selectedPreset = PRESETS[presetName];
     
-    // Показать описание
     document.getElementById('preset-description').innerHTML = `
         <i class="fas fa-info-circle"></i> ${selectedPreset.description}
     `;
     
-    // Обновить целевые значения
     document.getElementById('target-type').textContent = selectedPreset.type;
     document.getElementById('target-mode').textContent = selectedPreset.guitar_bass;
     
@@ -67,6 +82,8 @@ function loadPreset(presetName) {
     
     updateAllKnobs();
     updateProgress();
+    
+    addDebugLog('Загружен пресет: ' + presetName);
 }
 
 // Инициализация слайдеров
@@ -95,11 +112,9 @@ function updateKnob(param, currentValue) {
     const targetValue = selectedPreset[paramKey];
     const maxValue = param === 'variation' ? 11 : 10;
     
-    // Расчёт углов (от -135° до +135°, всего 270°)
     const currentAngle = ((currentValue / maxValue) * 270) - 135;
     const targetAngle = ((targetValue / maxValue) * 270) - 135;
     
-    // Обновление SVG линий
     const currentLine = document.getElementById(`${param}-current`);
     const targetLine = document.getElementById(`${param}-target`);
     
@@ -116,7 +131,6 @@ function updateKnob(param, currentValue) {
     targetLine.setAttribute('x2', targetX);
     targetLine.setAttribute('y2', targetY);
     
-    // Обновление стрелки направления
     const arrowElement = document.getElementById(`${param}-arrow`);
     if (currentValue < targetValue) {
         arrowElement.innerHTML = '↻ Вправо';
@@ -232,12 +246,15 @@ function setupAudioButton() {
     button.addEventListener('click', async () => {
         if (!isAudioActive) {
             try {
+                addDebugLog('Запрос доступа к микрофону...');
                 await startAudio();
                 button.innerHTML = '<i class="fas fa-microphone-slash"></i> Выключить микрофон';
                 status.className = 'status-on';
                 status.innerHTML = '<i class="fas fa-circle"></i> Микрофон активен';
                 isAudioActive = true;
+                addDebugLog('✓ Микрофон активирован');
             } catch (error) {
+                addDebugLog('✗ Ошибка: ' + error.message);
                 alert('Ошибка доступа к микрофону: ' + error.message);
             }
         } else {
@@ -246,6 +263,7 @@ function setupAudioButton() {
             status.className = 'status-off';
             status.innerHTML = '<i class="fas fa-circle"></i> Микрофон выключен';
             isAudioActive = false;
+            addDebugLog('Микрофон выключен');
         }
     });
 }
@@ -254,14 +272,26 @@ function setupAudioButton() {
 async function startAudio() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
+    analyser.fftSize = 4096; // Увеличено для лучшей точности
+    analyser.smoothingTimeConstant = 0.8;
     
     bufferLength = analyser.frequencyBinCount;
     dataArray = new Uint8Array(bufferLength);
     
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    addDebugLog('AudioContext создан, sampleRate: ' + audioContext.sampleRate);
+    
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+        } 
+    });
+    
     microphone = audioContext.createMediaStreamSource(stream);
     microphone.connect(analyser);
+    
+    addDebugLog('Микрофон подключен к анализатору');
     
     detectPitch();
     drawWaveform();
@@ -282,13 +312,13 @@ function stopAudio() {
     }
 }
 
-// Детекция высоты тона (pitch detection)
+// Детекция высоты тона (улучшенная версия)
 function detectPitch() {
     if (!isAudioActive) return;
     
     analyser.getByteTimeDomainData(dataArray);
     
-    // Расчёт уровня громкости
+    // Расчёт уровня громкости (RMS)
     let sum = 0;
     for (let i = 0; i < bufferLength; i++) {
         const normalized = (dataArray[i] - 128) / 128;
@@ -298,25 +328,55 @@ function detectPitch() {
     const volume = Math.round(rms * 100);
     
     // Обновляем индикатор громкости
-    document.getElementById('volume-fill').style.width = `${Math.min(volume * 2, 100)}%`;
-    document.getElementById('volume-text').textContent = `${volume}%`;
+    const volumeFill = document.getElementById('volume-fill');
+    const volumeText = document.getElementById('volume-text');
+    const signalStatus = document.getElementById('signal-status');
+    
+    if (volumeFill && volumeText) {
+        volumeFill.style.width = `${Math.min(volume * 3, 100)}%`;
+        volumeText.textContent = `${volume}%`;
+        
+        if (volume < 1) {
+            signalStatus.textContent = '🔇 Нет сигнала';
+            signalStatus.style.color = '#e74c3c';
+        } else if (volume < 5) {
+            signalStatus.textContent = '🔉 Слабый сигнал';
+            signalStatus.style.color = '#f39c12';
+        } else {
+            signalStatus.textContent = '🔊 Сигнал хороший';
+            signalStatus.style.color = '#2ecc71';
+        }
+    }
     
     // Автокорреляция для определения частоты
     const frequency = autoCorrelate(dataArray, audioContext.sampleRate);
     
-    if (frequency > 0 && volume > 1) {
+    if (frequency > 0 && volume > 2) {
         const note = frequencyToNote(frequency);
         document.getElementById('detected-note').textContent = note;
         document.getElementById('frequency').textContent = `${frequency.toFixed(2)} Hz`;
+        
+        // Логируем только при изменении ноты
+        if (!window.lastNote || window.lastNote !== note) {
+            addDebugLog(`Нота: ${note}, Частота: ${frequency.toFixed(2)} Hz, Громкость: ${volume}%`);
+            window.lastNote = note;
+        }
     } else {
         document.getElementById('detected-note').textContent = '--';
-        document.getElementById('frequency').textContent = `-- Hz`;
+        document.getElementById('frequency').textContent = '-- Hz';
+        
+        if (volume < 2 && !window.lowVolumeLogged) {
+            addDebugLog(`Сигнал слишком слабый: ${volume}% (нужно >2%)`);
+            window.lowVolumeLogged = true;
+        } else if (volume >= 2) {
+            window.lowVolumeLogged = false;
+        }
     }
     
-    setTimeout(() => detectPitch(), 100);
+    setTimeout(() => detectPitch(), 50); // Увеличена частота опроса
 }
 
-// Автокорреляция (алгоритм определения частоты)
+// Автокорреляция (улучшенный алгоритм)
 function autoCorrelate(buffer, sampleRate) {
     const SIZE = buffer.length;
     const MAX_SAMPLES = Math.floor(SIZE / 2);
@@ -324,14 +384,17 @@ function autoCorrelate(buffer, sampleRate) {
     let best_correlation = 0;
     let rms = 0;
     
+    // Расчёт RMS
     for (let i = 0; i < SIZE; i++) {
         const val = (buffer[i] - 128) / 128;
         rms += val * val;
     }
     rms = Math.sqrt(rms / SIZE);
     
+    // Если сигнал слишком слабый, выходим
     if (rms < 0.01) return -1;
     
+    // Поиск первого пересечения нуля
     let lastCorrelation = 1;
     for (let offset = 1; offset < MAX_SAMPLES; offset++) {
         let correlation = 0;
@@ -353,8 +416,13 @@ function autoCorrelate(buffer, sampleRate) {
         lastCorrelation = correlation;
     }
     
-    if (best_correlation > 0.01) {
-        return sampleRate / best_offset;
+    if (best_correlation > 0.01 && best_offset > 0) {
+        const frequency = sampleRate / best_offset;
+        
+        // Фильтруем нереалистичные частоты для гитары (82-1200 Hz)
+        if (frequency >= 70 && frequency <= 1500) {
+            return frequency;
+        }
     }
     
     return -1;
@@ -392,6 +460,15 @@ function drawWaveform() {
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, width, height);
     
+    // Сетка
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, height / 2);
+    ctx.lineTo(width, height / 2);
+    ctx.stroke();
+    
+    // Форма волны
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#3498db';
     ctx.beginPath();
@@ -422,7 +499,7 @@ function drawWaveform() {
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('service-worker.js')
-            .then(() => console.log('Service Worker зарегистрирован'))
-            .catch(err => console.log('Ошибка Service Worker:', err));
+            .then(() => addDebugLog('Service Worker зарегистрирован'))
+            .catch(err => addDebugLog('Ошибка Service Worker: ' + err));
     }
 }
