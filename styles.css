@@ -1,0 +1,389 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #333;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* Заголовок */
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 3px solid #e74c3c;
+}
+
+header h1 {
+    font-size: 2.5em;
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    color: #7f8c8d;
+    font-size: 1.1em;
+}
+
+/* Секции */
+section {
+    margin-bottom: 40px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 15px;
+}
+
+section h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 1.8em;
+}
+
+/* Выбор пресета */
+.preset-selector label {
+    display: block;
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+#preset-select {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.1em;
+    border: 2px solid #3498db;
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+#preset-select:hover {
+    border-color: #2980b9;
+}
+
+.preset-description {
+    margin-top: 15px;
+    padding: 15px;
+    background: #e8f4f8;
+    border-left: 4px solid #3498db;
+    border-radius: 5px;
+    font-size: 1.1em;
+}
+
+/* Аудио контроль */
+.audio-control {
+    text-align: center;
+}
+
+.btn-primary {
+    padding: 15px 40px;
+    font-size: 1.2em;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+}
+
+.btn-primary:hover {
+    background: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.6);
+}
+
+#audio-status {
+    margin-top: 15px;
+    padding: 10px 20px;
+    border-radius: 25px;
+    display: inline-block;
+    font-weight: bold;
+}
+
+.status-off {
+    background: #ecf0f1;
+    color: #7f8c8d;
+}
+
+.status-on {
+    background: #2ecc71;
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Детектор ноты */
+.note-detector {
+    text-align: center;
+}
+
+.note-display {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin: 20px 0;
+}
+
+.note-value {
+    font-size: 4em;
+    font-weight: bold;
+    color: #3498db;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.frequency-value {
+    font-size: 2em;
+    color: #7f8c8d;
+}
+
+#waveform {
+    width: 100%;
+    max-width: 800px;
+    height: 150px;
+    border: 2px solid #3498db;
+    border-radius: 10px;
+    margin: 20px auto;
+    display: block;
+    background: #1a1a1a;
+}
+
+/* Параметры */
+.parameter-group {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.param-header h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.param-values {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    margin: 20px 0;
+}
+
+.value-box {
+    text-align: center;
+    padding: 15px;
+    background: #ecf0f1;
+    border-radius: 10px;
+    min-width: 150px;
+}
+
+.value-box.target {
+    background: #d5f4e6;
+}
+
+.value-box label {
+    display: block;
+    font-size: 0.9em;
+    color: #7f8c8d;
+    margin-bottom: 5px;
+}
+
+.value-box .value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.arrow-indicator {
+    font-size: 2em;
+    font-weight: bold;
+}
+
+.btn-confirm {
+    padding: 10px 30px;
+    background: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 1.1em;
+    transition: all 0.3s;
+}
+
+.btn-confirm:hover {
+    background: #229954;
+    transform: scale(1.05);
+}
+
+/* Ручки управления */
+.knobs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 30px;
+    margin-top: 30px;
+}
+
+.knob-container {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.knob-container h4 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+}
+
+.knob-visual {
+    margin: 20px 0;
+}
+
+.knob-svg {
+    width: 150px;
+    height: 150px;
+}
+
+.knob-values {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 15px 0;
+    font-size: 0.9em;
+}
+
+.arrow-text {
+    font-size: 1.5em;
+    font-weight: bold;
+}
+
+.slider {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: #d3d3d3;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3498db;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3498db;
+    cursor: pointer;
+}
+
+/* Прогресс */
+.progress-section {
+    text-align: center;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 30px;
+    background: #ecf0f1;
+    border-radius: 15px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    transition: width 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-text {
+    font-size: 1.2em;
+    color: #2c3e50;
+    font-weight: bold;
+}
+
+.completion-message {
+    margin-top: 20px;
+    padding: 20px;
+    background: #d5f4e6;
+    border: 2px solid #27ae60;
+    border-radius: 10px;
+    font-size: 1.3em;
+    color: #27ae60;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Футер */
+footer {
+    text-align: center;
+    padding: 20px;
+    color: #7f8c8d;
+    border-top: 2px solid #ecf0f1;
+}
+
+footer a {
+    color: #3498db;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+footer a:hover {
+    color: #2980b9;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 1.8em;
+    }
+    
+    .note-value {
+        font-size: 2.5em;
+    }
+    
+    .knobs-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .param-values {
+        flex-direction: column;
+        gap: 15px;
+    }
+}
