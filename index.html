@@ -41,18 +41,37 @@
         <!-- Детектор ноты -->
         <section class="note-detector">
             <h2>🎵 Текущая нота</h2>
-            <div class="note-display">
-                <div id="detected-note" class="note-value">--</div>
-                <div id="frequency" class="frequency-value">-- Hz</div>
-            </div>
+            
+            <!-- Индикатор уровня сигнала -->
             <div class="volume-meter">
-    <label>Уровень сигнала:</label>
-    <div class="volume-bar">
-        <div id="volume-fill" class="volume-fill"></div>
-    </div>
-    <span id="volume-text">0%</span>
-</div>
+                <label>📊 Уровень входящего сигнала:</label>
+                <div class="volume-bar">
+                    <div id="volume-fill" class="volume-fill"></div>
+                </div>
+                <div class="volume-info">
+                    <span id="volume-text" class="volume-value">0%</span>
+                    <span id="signal-status" class="signal-status">Жду сигнал...</span>
+                </div>
+            </div>
+
+            <div class="note-display">
+                <div class="note-box">
+                    <label>Нота:</label>
+                    <div id="detected-note" class="note-value">--</div>
+                </div>
+                <div class="freq-box">
+                    <label>Частота:</label>
+                    <div id="frequency" class="frequency-value">-- Hz</div>
+                </div>
+            </div>
+            
             <canvas id="waveform" width="800" height="150"></canvas>
+            
+            <!-- Отладочная информация -->
+            <div class="debug-info">
+                <h3>🔧 Отладка:</h3>
+                <div id="debug-output"></div>
+            </div>
         </section>
 
         <!-- Настройка параметров -->
@@ -210,7 +229,7 @@
         <!-- Футер -->
         <footer>
             <p>🎸 Boss SY-1 Preset Tuner | Real-time версия</p>
-            <p><a href="https://github.com/your-username/boss-sy1-pwa" target="_blank">
+            <p><a href="https://github.com/biolink23-sketch/boss-sy1-pwa" target="_blank">
                 <i class="fab fa-github"></i> GitHub
             </a></p>
         </footer>
