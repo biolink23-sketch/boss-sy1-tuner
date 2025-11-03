@@ -365,7 +365,7 @@ function setupClearDebugButton() {
     });
 }
 
-// Запуск аудио с максимальной чувствительностью
+// Запуск аудио с выбором устройства
 async function startAudio() {
     try {
         // Получаем список устройств
@@ -373,19 +373,43 @@ async function startAudio() {
         const audioDevices = devices.filter(device => device.kind === 'audioinput');
         
         addDebugLog(`Найдено аудио устройств: ${audioDevices.length}`, 'info');
+        
+        if (audioDevices.length === 0) {
+            throw new Error('Микрофоны не найдены! Подключите микрофон.');
+        }
+        
+        // Показываем список устройств
         audioDevices.forEach((device, index) => {
             const label = device.label || `Микрофон ${index + 1}`;
             addDebugLog(`  ${index + 1}. ${label}`, 'info');
         });
+        
+        // Если больше одного устройства - даём выбрать
+        let selectedDeviceId = null;
+        if (audioDevices.length > 1) {
+            const deviceList = audioDevices.map((d, i) => 
+                `${i + 1}. ${d.label || 'Микрофон ' + (i + 1)}`
+            ).join('\n');
+            
+            const choice = prompt(`Найдено ${audioDevices.length} микрофонов:\n\n${deviceList}\n\nВведите номер (1-${audioDevices.length}):`);
+            
+            if (choice && !isNaN(choice)) {
+                const index = parseInt(choice) - 1;
+                if (index >= 0 && index < audioDevices.length) {
+                    selectedDeviceId = audioDevices[index].deviceId;
+                    addDebugLog(`Выбран: ${audioDevices[index].label}`, 'success');
+                }
+            }
+        }
         
         // Создаём AudioContext
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
         
         // МАКСИМАЛЬНАЯ ЧУВСТВИТЕЛЬНОСТЬ
-        analyser.fftSize = 8192; // Увеличено для лучшей точности
-        analyser.smoothingTimeConstant = 0.3; // Уменьшено для быстрого отклика
-        analyser.minDecibels = -100; // Ловим даже очень тихие звуки
+        analyser.fftSize = 8192;
+        analyser.smoothingTimeConstant = 0.3;
+        analyser.minDecibels = -100;
         analyser.maxDecibels = -10;
         
         bufferLength = analyser.frequencyBinCount;
@@ -394,20 +418,23 @@ async function startAudio() {
         
         addDebugLog(`AudioContext: sampleRate=${audioContext.sampleRate} Hz, FFT=${analyser.fftSize}`, 'success');
         
-        // Запрашиваем микрофон с оптимальными настройками
+        // Запрашиваем микрофон
         const constraints = {
-            audio: {
-                echoCancellation: false,  // Отключаем подавление эха
-                noiseSuppression: false,  // Отключаем шумоподавление
-                autoGainControl: true,    // ВКЛЮЧАЕМ автоусиление
-                sampleRate: 48000,
-                channelCount: 1,
-                latency: 0,
-                volume: 1.0
+            audio: selectedDeviceId ? {
+                deviceId: { exact: selectedDeviceId },
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: true,
+                sampleRate: 48000
+            } : {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: true,
+                sampleRate: 48000
             }
         };
         
-        addDebugLog('Запрос микрофона с настройками: ' + JSON.stringify(constraints.audio), 'info');
+        addDebugLog('Запрос микрофона...', 'info');
         
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         
@@ -415,22 +442,30 @@ async function startAudio() {
         const tracks = stream.getAudioTracks();
         if (tracks.length > 0) {
             const settings = tracks[0].getSettings();
-            addDebugLog(`Используется: ${tracks[0].label}`, 'success');
+            addDebugLog(`✓ Используется: ${tracks[0].label}`, 'success');
             addDebugLog(`Настройки: sampleRate=${settings.sampleRate}, channels=${settings.channelCount}`, 'info');
+            
+            // Проверяем, что трек активен
+            if (tracks[0].readyState !== 'live') {
+                throw new Error('Микрофон не активен! readyState=' + tracks[0].readyState);
+            }
+            
+            addDebugLog(`Статус микрофона: ${tracks[0].readyState} (должно быть "live")`, 'info');
         }
         
         // Подключаем микрофон
         microphone = audioContext.createMediaStreamSource(stream);
         
-        // Добавляем усилитель (gain node)
+        // Добавляем усилитель
         const gainNode = audioContext.createGain();
-        gainNode.gain.value = 3.0; // Усиление в 3 раза!
+        gainNode.gain.value = 5.0; // Усиление x5!
         
         microphone.connect(gainNode);
         gainNode.connect(analyser);
         
-        addDebugLog('✓ Микрофон подключен с усилением x3', 'success');
-        addDebugLog('💡 Сыграйте на гитаре громко!', 'info');
+        addDebugLog('✓ Микрофон подключен с усилением x5', 'success');
+        addDebugLog('💡 ГОВОРИТЕ ГРОМКО или ХЛОПНИТЕ В ЛАДОШИ!', 'warning');
+        addDebugLog('💡 Если 0% не меняется - микрофон не работает!', 'warning');
         
         // Сбрасываем статистику
         stats = {
@@ -447,9 +482,27 @@ async function startAudio() {
         drawWaveform();
         drawSpectrum();
         
+        // Через 3 секунды проверяем, работает ли
+        setTimeout(() => {
+            if (maxVolume === 0) {
+                addDebugLog('⚠️ За 3 секунды не было звука! Проверьте микрофон!', 'error');
+                addDebugLog('1. Говорите прямо в микрофон', 'warning');
+                addDebugLog('2. Проверьте, не выключен ли микрофон (кнопка mute)', 'warning');
+                addDebugLog('3. Зайдите в настройки звука системы', 'warning');
+            } else {
+                addDebugLog(`✓ Микрофон работает! Пик громкости: ${maxVolume}%`, 'success');
+            }
+        }, 3000);
+        
     } catch (error) {
         addDebugLog('✗ КРИТИЧЕСКАЯ ОШИБКА: ' + error.message, 'error');
-        addDebugLog('Стек: ' + error.stack, 'error');
+        if (error.name === 'NotFoundError') {
+            addDebugLog('Микрофон не найден! Подключите микрофон к компьютеру.', 'error');
+        } else if (error.name === 'NotAllowedError') {
+            addDebugLog('Доступ к микрофону запрещён! Разрешите в настройках браузера.', 'error');
+        } else if (error.name === 'NotReadableError') {
+            addDebugLog('Микрофон занят другим приложением! Закройте Zoom/Skype/Discord.', 'error');
+        }
         throw error;
     }
 }
@@ -488,7 +541,7 @@ function stopAudio() {
     addDebugLog(`Статистика сессии: обработано ${stats.totalSamples} сэмплов, распознано ${stats.detectedFrequencies} частот, пик ${stats.peakVolume}%`, 'info');
 }
 
-// Детекция высоты тона (улучшенная версия)
+// Детекция высоты тона
 function detectPitch() {
     if (!isAudioActive) return;
     
@@ -503,7 +556,7 @@ function detectPitch() {
         sum += normalized * normalized;
     }
     const rms = Math.sqrt(sum / bufferLength);
-    const volume = Math.round(rms * 300); // Увеличен коэффициент для чувствительности
+    const volume = Math.round(rms * 300); // Коэффициент для чувствительности
     
     // Обновляем историю громкости
     volumeHistory.push(volume);
@@ -559,7 +612,7 @@ function detectPitch() {
     // Автокорреляция для определения частоты
     const frequency = autoCorrelate(dataArray, audioContext.sampleRate);
     
-    // СНИЖЕН ПОРОГ до 0.3% для максимальной чувствительности
+    // Порог 0.3% для максимальной чувствительности
     if (frequency > 0 && volume > 0.3) {
         const note = frequencyToNote(frequency);
         const confidence = Math.min(100, Math.round((volume / 20) * 100));
@@ -595,10 +648,10 @@ function detectPitch() {
         }
     }
     
-    setTimeout(() => detectPitch(), 30); // Увеличена частота опроса
+    setTimeout(() => detectPitch(), 30);
 }
 
-// Автокорреляция (улучшенный алгоритм для гитары)
+// Автокорреляция
 function autoCorrelate(buffer, sampleRate) {
     const SIZE = buffer.length;
     const MAX_SAMPLES = Math.floor(SIZE / 2);
@@ -613,7 +666,6 @@ function autoCorrelate(buffer, sampleRate) {
     }
     rms = Math.sqrt(rms / SIZE);
     
-    // СНИЖЕН ПОРОГ для максимальной чувствительности
     if (rms < 0.001) return -1;
     
     // Ищем корреляцию
@@ -627,7 +679,6 @@ function autoCorrelate(buffer, sampleRate) {
         
         correlation = 1 - (correlation / MAX_SAMPLES);
         
-        // СНИЖЕН ПОРОГ корреляции
         if (correlation > 0.85 && correlation > lastCorrelation) {
             if (correlation > best_correlation) {
                 best_correlation = correlation;
@@ -641,7 +692,7 @@ function autoCorrelate(buffer, sampleRate) {
     if (best_correlation > 0.01 && best_offset > 0) {
         const frequency = sampleRate / best_offset;
         
-        // Диапазон для гитары/баса: 70-1500 Hz (расширен)
+        // Диапазон для гитары/баса: 70-1500 Hz
         if (frequency >= 70 && frequency <= 1500) {
             return frequency;
         }
@@ -687,7 +738,6 @@ function drawWaveform() {
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 5]);
     
-    // Горизонтальные линии
     for (let i = 0; i <= 4; i++) {
         const y = (height / 4) * i;
         ctx.beginPath();
@@ -754,7 +804,6 @@ function drawSpectrum() {
     for (let i = 0; i < frequencyArray.length; i++) {
         barHeight = (frequencyArray[i] / 255) * height;
         
-        // Градиент
         const gradient = ctx.createLinearGradient(0, height - barHeight, 0, height);
         gradient.addColorStop(0, '#e74c3c');
         gradient.addColorStop(0.5, '#f39c12');
