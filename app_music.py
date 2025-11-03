@@ -1,6 +1,10 @@
 import streamlit as st
 import numpy as np
-import sounddevice as sd
+try:
+    import sounddevice as sd
+    AUDIO_AVAILABLE = True
+except:
+    AUDIO_AVAILABLE = False
 import plotly.graph_objects as go
 from scipy import signal
 import time
@@ -291,10 +295,13 @@ with st.sidebar:
     st.markdown("---")
     
     # Аудио мониторинг
-    st.subheader("🎤 Аудио мониторинг")
-    
+st.subheader("🎤 Аудио мониторинг")
+
+if AUDIO_AVAILABLE:
     if st.button("▶️ Старт мониторинг" if not st.session_state.audio_monitoring else "⏸️ Стоп мониторинг"):
         st.session_state.audio_monitoring = not st.session_state.audio_monitoring
+else:
+    st.info("⚠️ Аудио мониторинг доступен только в локальной версии")
 
 # Основная область
 tab1, tab2, tab3 = st.tabs(["🎯 Настройка", "📊 Визуализация", "📚 Библиотека пресетов"])
