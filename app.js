@@ -368,104 +368,37 @@ function setupClearDebugButton() {
 // Запуск аудио с выбором устройства
 async function startAudio() {
     try {
-        // Получаем список устройств
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const audioDevices = devices.filter(device => device.kind === 'audioinput');
+        addDebugLog('Запрос доступа к микрофону...', 'info');
         
-        addDebugLog(`Найдено аудио устройств: ${audioDevices.length}`, 'info');
-        
-        if (audioDevices.length === 0) {
-            throw new Error('Микрофоны не найдены! Подключите микрофон.');
-        }
-        
-        // Показываем список устройств
-        audioDevices.forEach((device, index) => {
-            const label = device.label || `Микрофон ${index + 1}`;
-            addDebugLog(`  ${index + 1}. ${label}`, 'info');
+        // Простой запрос без лишних настроек
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true  // Минимальные настройки!
         });
         
-        // Если больше одного устройства - даём выбрать
-        let selectedDeviceId = null;
-        if (audioDevices.length > 1) {
-            const deviceList = audioDevices.map((d, i) => 
-                `${i + 1}. ${d.label || 'Микрофон ' + (i + 1)}`
-            ).join('\n');
-            
-            const choice = prompt(`Найдено ${audioDevices.length} микрофонов:\n\n${deviceList}\n\nВведите номер (1-${audioDevices.length}):`);
-            
-            if (choice && !isNaN(choice)) {
-                const index = parseInt(choice) - 1;
-                if (index >= 0 && index < audioDevices.length) {
-                    selectedDeviceId = audioDevices[index].deviceId;
-                    addDebugLog(`Выбран: ${audioDevices[index].label}`, 'success');
-                }
-            }
-        }
+        addDebugLog('✓ Разрешение получено!', 'success');
         
         // Создаём AudioContext
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
-        
-        // МАКСИМАЛЬНАЯ ЧУВСТВИТЕЛЬНОСТЬ
-        analyser.fftSize = 8192;
-        analyser.smoothingTimeConstant = 0.3;
-        analyser.minDecibels = -100;
-        analyser.maxDecibels = -10;
+        analyser.fftSize = 2048;  // Как в тесте
         
         bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
         frequencyArray = new Uint8Array(analyser.frequencyBinCount);
         
-        addDebugLog(`AudioContext: sampleRate=${audioContext.sampleRate} Hz, FFT=${analyser.fftSize}`, 'success');
-        
-        // Запрашиваем микрофон
-        const constraints = {
-            audio: selectedDeviceId ? {
-                deviceId: { exact: selectedDeviceId },
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: true,
-                sampleRate: 48000
-            } : {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: true,
-                sampleRate: 48000
-            }
-        };
-        
-        addDebugLog('Запрос микрофона...', 'info');
-        
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        
-        // Информация о выбранном устройстве
-        const tracks = stream.getAudioTracks();
-        if (tracks.length > 0) {
-            const settings = tracks[0].getSettings();
-            addDebugLog(`✓ Используется: ${tracks[0].label}`, 'success');
-            addDebugLog(`Настройки: sampleRate=${settings.sampleRate}, channels=${settings.channelCount}`, 'info');
-            
-            // Проверяем, что трек активен
-            if (tracks[0].readyState !== 'live') {
-                throw new Error('Микрофон не активен! readyState=' + tracks[0].readyState);
-            }
-            
-            addDebugLog(`Статус микрофона: ${tracks[0].readyState} (должно быть "live")`, 'info');
-        }
+        addDebugLog(`AudioContext: sampleRate=${audioContext.sampleRate}`, 'success');
         
         // Подключаем микрофон
         microphone = audioContext.createMediaStreamSource(stream);
         
-        // Добавляем усилитель
+        // Усилитель x5 (как в тесте)
         const gainNode = audioContext.createGain();
-        gainNode.gain.value = 5.0; // Усиление x5!
+        gainNode.gain.value = 5.0;
         
         microphone.connect(gainNode);
         gainNode.connect(analyser);
         
         addDebugLog('✓ Микрофон подключен с усилением x5', 'success');
-        addDebugLog('💡 ГОВОРИТЕ ГРОМКО или ХЛОПНИТЕ В ЛАДОШИ!', 'warning');
-        addDebugLog('💡 Если 0% не меняется - микрофон не работает!', 'warning');
         
         // Сбрасываем статистику
         stats = {
@@ -482,27 +415,8 @@ async function startAudio() {
         drawWaveform();
         drawSpectrum();
         
-        // Через 3 секунды проверяем, работает ли
-        setTimeout(() => {
-            if (maxVolume === 0) {
-                addDebugLog('⚠️ За 3 секунды не было звука! Проверьте микрофон!', 'error');
-                addDebugLog('1. Говорите прямо в микрофон', 'warning');
-                addDebugLog('2. Проверьте, не выключен ли микрофон (кнопка mute)', 'warning');
-                addDebugLog('3. Зайдите в настройки звука системы', 'warning');
-            } else {
-                addDebugLog(`✓ Микрофон работает! Пик громкости: ${maxVolume}%`, 'success');
-            }
-        }, 3000);
-        
     } catch (error) {
-        addDebugLog('✗ КРИТИЧЕСКАЯ ОШИБКА: ' + error.message, 'error');
-        if (error.name === 'NotFoundError') {
-            addDebugLog('Микрофон не найден! Подключите микрофон к компьютеру.', 'error');
-        } else if (error.name === 'NotAllowedError') {
-            addDebugLog('Доступ к микрофону запрещён! Разрешите в настройках браузера.', 'error');
-        } else if (error.name === 'NotReadableError') {
-            addDebugLog('Микрофон занят другим приложением! Закройте Zoom/Skype/Discord.', 'error');
-        }
+        addDebugLog('✗ ОШИБКА: ' + error.message, 'error');
         throw error;
     }
 }
@@ -549,26 +463,25 @@ function detectPitch() {
     
     analyser.getByteTimeDomainData(dataArray);
     
-    // Расчёт RMS (громкости)
+    // Расчёт громкости (КАК В ТЕСТЕ)
     let sum = 0;
     for (let i = 0; i < bufferLength; i++) {
         const normalized = (dataArray[i] - 128) / 128;
         sum += normalized * normalized;
     }
     const rms = Math.sqrt(sum / bufferLength);
-    const volume = Math.round(rms * 300); // Коэффициент для чувствительности
+    const volume = Math.round(rms * 300);  // Как в тесте
     
-    // Обновляем историю громкости
+    // Обновляем историю
     volumeHistory.push(volume);
     if (volumeHistory.length > 10) volumeHistory.shift();
-    avgVolume = Math.round(volumeHistory.reduce((a, b) => a + b, 0) / volumeHistory.length);
     
     if (volume > maxVolume) {
         maxVolume = volume;
         stats.peakVolume = volume;
     }
     
-    // Расчёт в децибелах
+    // Расчёт в dB
     const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
     
     // Обновляем индикаторы
@@ -576,8 +489,6 @@ function detectPitch() {
     const volumeText = document.getElementById('volume-text');
     const volumeDb = document.getElementById('volume-db');
     const signalStatus = document.getElementById('signal-status');
-    const audioIndicator = document.getElementById('audio-indicator');
-    const waveformStatus = document.getElementById('waveform-status');
     
     if (volumeFill && volumeText) {
         const displayVolume = Math.min(volume, 100);
@@ -585,30 +496,43 @@ function detectPitch() {
         volumeText.textContent = `${volume}%`;
         volumeDb.textContent = db === -Infinity ? '-∞ dB' : `${db.toFixed(1)} dB`;
         
-        // Статус сигнала
+        // Статус
         if (volume < 1) {
-            signalStatus.textContent = '🔇 Нет сигнала - Сыграйте громче!';
+            signalStatus.textContent = '🔇 Нет сигнала';
             signalStatus.style.color = '#e74c3c';
-            audioIndicator.className = 'audio-indicator off';
-            waveformStatus.textContent = 'Ожидание звука... Сыграйте на гитаре!';
         } else if (volume < 5) {
-            signalStatus.textContent = '🔉 Слабый сигнал - Увеличьте громкость усилителя';
+            signalStatus.textContent = '🔉 Слабый сигнал';
             signalStatus.style.color = '#f39c12';
-            audioIndicator.className = 'audio-indicator weak';
-            waveformStatus.textContent = 'Сигнал слабый, увеличьте громкость';
-        } else if (volume < 15) {
-            signalStatus.textContent = '🔊 Сигнал хороший - Продолжайте!';
-            signalStatus.style.color = '#2ecc71';
-            audioIndicator.className = 'audio-indicator good';
-            waveformStatus.textContent = 'Сигнал хороший, анализирую...';
         } else {
-            signalStatus.textContent = '🔊🔊 Отличный сигнал!';
-            signalStatus.style.color = '#27ae60';
-            audioIndicator.className = 'audio-indicator excellent';
-            waveformStatus.textContent = 'Отличный сигнал!';
+            signalStatus.textContent = '🔊 Сигнал хороший!';
+            signalStatus.style.color = '#2ecc71';
         }
     }
     
+    // Автокорреляция
+    const frequency = autoCorrelate(dataArray, audioContext.sampleRate);
+    
+    if (frequency > 0 && volume > 0.3) {
+        const note = frequencyToNote(frequency);
+        const confidence = Math.min(100, Math.round((volume / 20) * 100));
+        
+        document.getElementById('detected-note').textContent = note;
+        document.getElementById('frequency').textContent = `${frequency.toFixed(2)} Hz`;
+        document.getElementById('note-confidence').textContent = `Точность: ${confidence}%`;
+        
+        stats.detectedFrequencies++;
+        
+        if (!window.lastNote || window.lastNote !== note) {
+            addDebugLog(`♪ ${note} (${frequency.toFixed(1)} Hz, ${volume}%)`, 'success');
+            window.lastNote = note;
+        }
+    } else {
+        document.getElementById('detected-note').textContent = '--';
+        document.getElementById('frequency').textContent = '-- Hz';
+        document.getElementById('note-confidence').textContent = 'Точность: --%';
+    }
+    
+    setTimeout(() => detectPitch(), 30);
     // Автокорреляция для определения частоты
     const frequency = autoCorrelate(dataArray, audioContext.sampleRate);
     
