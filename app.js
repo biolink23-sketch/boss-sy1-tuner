@@ -288,16 +288,28 @@ function detectPitch() {
     
     analyser.getByteTimeDomainData(dataArray);
     
+    // ДОБАВЛЕНО: Расчёт уровня громкости
+    let sum = 0;
+    for (let i = 0; i < bufferLength; i++) {
+        const normalized = (dataArray[i] - 128) / 128;
+        sum += normalized * normalized;
+    }
+    const rms = Math.sqrt(sum / bufferLength);
+    const volume = Math.round(rms * 100);
+    
+    // ДОБАВЛЕНО: Показываем уровень громкости
+    console.log('Volume level:', volume);
+    
     // Автокорреляция для определения частоты
     const frequency = autoCorrelate(dataArray, audioContext.sampleRate);
     
-    if (frequency > 0) {
+    if (frequency > 0 && volume > 1) { // ИЗМЕНЕНО: добавлена проверка громкости
         const note = frequencyToNote(frequency);
         document.getElementById('detected-note').textContent = note;
-        document.getElementById('frequency').textContent = `${frequency.toFixed(2)} Hz`;
+        document.getElementById('frequency').textContent = `${frequency.toFixed(2)} Hz (Vol: ${volume})`;
     } else {
         document.getElementById('detected-note').textContent = '--';
-        document.getElementById('frequency').textContent = '-- Hz';
+        document.getElementById('frequency').textContent = `-- Hz (Vol: ${volume})`;
     }
     
     setTimeout(() => detectPitch(), 100);
